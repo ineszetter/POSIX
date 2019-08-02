@@ -1,0 +1,143 @@
+/*
+Universidad Guadalajara Lamar
+Ingenieria en Computacion
+Sistemas Operativos Avanzados
+7o Semestre
+Programa: PIPELINE DE N CAPAS
+Presenta: Maria Ines Calderon
+*/
+
+#include <semaphore.h>
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#DEFINE MAX_TAREAS 7
+
+//Aqui estamos usando dos arreglos de 8 espacios (del 0 al 7)
+sem_t encendido[MAX_TAREAS], apagado[MAX_TAREAS];
+int var[MAX_TAREAS];
+pthread_t tareas[MAX_TAREAS];
+
+
+
+void inicia_Semaforos(){
+int i;
+	 for(i=0; i<MAX_TAREAS; i++){
+	 sem_init(&encendido[i],0,1);
+	 sem_init(&apagado[i],0,0);
+
+	 //sem_init(SEMAFORO,0,1); //Semaforo entra siempre con esta sintaxis
+	 //sem_init(SEMAFORO,0,0); //Semaforo no entra con esta sintaxis
+	 }
+}
+
+
+//Para poder implementar un pipeline necesitamos de una estructura de datos de tipo arreglo, de esta manera se ira recorriendo un lugar a la vez en el mismo
+
+void inicia_arreglo(){
+int i;
+	for(i = 0; i<MAX_TAREAS;i++){
+	var[i] = 0;
+	}
+}
+
+
+//Tarea inicial la cual genera un numero aleatorio del 0 al 9
+void tarea0(){
+	while(1){
+	sem_wait(&encendido[0]);
+	var[0] = rand()%10; //Num. rand de 0 a 10
+	printf("\n Tarea 0 Genera: %d",var[0]);
+	sem_post(&apagado[0]);
+	sleep(1);
+	}
+}
+
+
+//Se envia el dato previamente generado a la posicion actual en el arreglo, una vez hecho esto se desactiva el semaforo, lo cual desencadena la activacion del siguiente semaforo en el arreglo
+void envia(int i, int dato){
+	sem_wait(&encendido[i]);
+	var[i] = dato;
+	sem_post(&apagado[i]);
+}
+
+
+//En esta seccion estamos recibiendo el dato -1 para evitar un stack overflow
+void recibe(int i, int dato){
+	sem_wait(&encendido[i-1]);
+	*dato = var[i-1];
+	sem_post(&apagado[i-1]);
+}
+
+
+void tareaIesima(void *identificador){
+
+int id, dato;
+id = (int)identificador;
+	
+	while(1){
+	//Recibe y envia son los semaforos
+	recibe(id,&dato);
+	dato++;
+	envia(id,dato);
+	}
+
+}
+
+
+
+void tareaN(void){
+
+int dato;
+	while(1){
+	sem_wait(&apaga[MAX_TAREAS-2]);
+	dato = var[MAX_TAREAS];
+	printf("\n Despues de %d tareas el dato ahora vale: %d", MAX_TAREAS-2,dato);
+	sem_post(&enciende[MAX_TAREAS-2]);
+	}
+
+}
+
+
+
+
+void crea_tareas(){
+//Crea hilos
+int i;
+	for(i = 1; i<MAX_TAREAS-1; i++){
+	pthread_create(&tareas[i],NULL,(void*)&tareaIesima,(void*)i);
+	}
+}
+
+
+void fin_tareas(){
+int i;
+//Finaliza hilos
+	for(i = 1; i<MAX_TAREAS; i++){
+	pthread_join(tareas[i], NULL);
+	}
+
+}
+
+
+int main(){
+//Inicializamos 
+inicia_semaforos();
+inicia_arreglo();
+
+//Crear la tarea inicial: tarea 0
+pthread_create(&tareas[0],NULL,(void*)&tarea0,NULL);
+
+//tareas intermedias
+crea_tareas();
+
+//crea el hilo para la tarea N (ULTIMO HILO)
+pthread_create(&tareas[MAX_TAREAS-1],NULL,(void*)&tareaN,NULL);
+
+
+//finalizacion de tareas
+fin_tareas();
+
+return 0;
+}
